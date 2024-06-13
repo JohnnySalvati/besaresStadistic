@@ -59,7 +59,6 @@ def table_builder(shops, data):
     style.map("Treeview",
             background=[("selected", "#009879")],
             foreground=[("selected", "white")])
-
     # Configure heading style
     style.configure("Treeview.Heading",
                     background="#009879",
@@ -70,7 +69,6 @@ def table_builder(shops, data):
                     'DELIVERY DIA', 'DELIVERY NOCHE', 'TOTAL DELIVERY', 'IMPORTE DELIVERY')
     else:
         columns = ('DIA', 'NOCHE', 'TOTAL', 'VENTAS', 'EFECTIVO', 'TARJETA', '% TARJETA-VENTAS')
-    
     # Create a frame for the treeview to add a border
     frame = tk.Frame(rootTable, bg='#f0f0f0')
     frame.pack(expand=True, fill='both', padx=10, pady=10)
@@ -78,7 +76,6 @@ def table_builder(shops, data):
     tv.column("#0", width=200, minwidth=200)
     tv.heading("#0", text='LOCAL', anchor=tk.CENTER)
     # Apply striped row effect
-
     for column in columns:
         tv.column(column, width=120, minwidth=55, anchor=tk.CENTER)
         tv.heading(column, text=column, anchor=tk.CENTER)
@@ -90,6 +87,7 @@ def table_builder(shops, data):
         rowPercent=[]
         for col in range(6): #la ultima columna esta agregada
             value = data[col][i]
+            value = 1 if value == 0 else value
             if rowToCompare: #valida que haya una fila anterior para comparar
                 perc = value/rowToCompare[col]-1
                 rowPercent.append(f"{perc:.0%}")
@@ -103,8 +101,12 @@ def table_builder(shops, data):
         if len(data)==10:
             for col in range(6,10):
                 value = data[col][i]
+                value = 1 if value == 0 else value
                 if rowToCompare: #valida que haya una fila anterior para comparar
-                    perc = value/int(rowToCompare[col+1])-1 #por la columna agregada de %
+                    try:    
+                        perc = value/int(rowToCompare[col+1])-1 #por la columna agregada de %
+                    except:
+                        perc = 0
                     rowPercent.append(f"{perc:.0%}")
                 rows.append(value)
         rowToCompare = rows.copy()
@@ -231,7 +233,6 @@ def table():
 def erase(btn):
     info = btn.grid_info() #get the row
     row = info['row']
-
     # Remove the file name from the list
     del fileNames[row]
     # Destroy the corresponding label and button widgets
