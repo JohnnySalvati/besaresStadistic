@@ -12,11 +12,11 @@ locale.setlocale(locale.LC_ALL, '')
 
 def format_currency(value):
     """Format a value as currency."""
-    return locale.currency(value, grouping=True)
+    return locale.currency(value, grouping=True)[:-3]
 
 # *** CARGA UN EXCEL EN UN DATAFRAME
 def loadExcel(file):
-    try:
+    try:# ACA AGREGAMOS LAS COLUMNAS SI ES PAROISSIEN
         dataFrame = pd.read_excel(file, sheet_name=2, header=None, skiprows=4, usecols='B:F, I, J, O:R', 
                     names=['Fecha', 'CubiertosDia', 'PromedioDia', 'CubiertosNoche', 'PromedioNoche', 'TotalTarjeta', 'TotalEfectivo', 'deliveryDia', 'deliveryNoche', 'totalDelivery', 'importeDelivery'],
                     dtype={'B': datetime,
@@ -31,7 +31,7 @@ def loadExcel(file):
                         'Q': np.int32,
                         'R': np.float64
                         }).dropna()
-    except:
+    except:# ACA AGREGAMOS LAS COLUMNAS para el resto
         dataFrame = pd.read_excel(file, sheet_name=2, header=None, skiprows=4, usecols='B:F, I, J', 
                     names=['Fecha', 'CubiertosDia', 'PromedioDia', 'CubiertosNoche', 'PromedioNoche', 'TotalTarjeta', 'TotalEfectivo'],
                     dtype={'B': datetime,
@@ -67,17 +67,21 @@ def table_builder(shops, data):
     if len(data)==10:
         columns = ('DIA', 'NOCHE', 'TOTAL', 'VENTAS', 'EFECTIVO', 'TARJETA', '% TARJETA-VENTAS',
                     'DELIVERY DIA', 'DELIVERY NOCHE', 'TOTAL DELIVERY', 'IMPORTE DELIVERY')
+        wides = (80,80,80,120,120,120,80,80,80,80,120)
     else:
         columns = ('DIA', 'NOCHE', 'TOTAL', 'VENTAS', 'EFECTIVO', 'TARJETA', '% TARJETA-VENTAS')
+        wides = (80,80,80,120,120,120,80)
+
     # Create a frame for the treeview to add a border
     frame = tk.Frame(rootTable, bg='#f0f0f0')
     frame.pack(expand=True, fill='both', padx=10, pady=10)
     tv = ttk.Treeview(frame, columns= columns)
-    tv.column("#0", width=200, minwidth=200)
+    tv.column("#0", width=180, minwidth=150)
     tv.heading("#0", text='LOCAL', anchor=tk.CENTER)
     # Apply striped row effect
-    for column in columns:
-        tv.column(column, width=120, minwidth=55, anchor=tk.CENTER)
+    
+    for i, column in enumerate(columns):
+        tv.column(column, width=wides[i], minwidth=wides[i], anchor=tk.CENTER)
         tv.heading(column, text=column, anchor=tk.CENTER)
     rowToCompare=[]
     tv.tag_configure('oddrow', background="#f8ffb8")
@@ -90,7 +94,10 @@ def table_builder(shops, data):
             value = 1 if value == 0 else value
             if rowToCompare: #valida que haya una fila anterior para comparar
                 perc = value/rowToCompare[col]-1
-                rowPercent.append(f"{perc:.0%}")
+                difference = value - rowToCompare[col]
+                if col in range(3,6): # si son importes le doy formato
+                    difference = format_currency(difference)
+                rowPercent.append(f"{difference} ({perc:.0%})")
             rows.append(value)
         # agrega comparacion de % tarjeta-ventas
         value = rows[5]/rows[3]
@@ -103,11 +110,9 @@ def table_builder(shops, data):
                 value = data[col][i]
                 value = 1 if value == 0 else value
                 if rowToCompare: #valida que haya una fila anterior para comparar
-                    try:    
-                        perc = value/int(rowToCompare[col+1])-1 #por la columna agregada de %
-                    except:
-                        perc = 0
-                    rowPercent.append(f"{perc:.0%}")
+                    perc = value/int(rowToCompare[col+1])-1 #por la columna agregada de %
+                    difference = value - int(rowToCompare[col+1])
+                    rowPercent.append(f"{difference} ({perc:.0%})")
                 rows.append(value)
         rowToCompare = rows.copy()
         if rowPercent: #valida que haya una fila de porcentajes
