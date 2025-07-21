@@ -17,37 +17,71 @@ def format_currency(value):
 # *** CARGA UN EXCEL EN UN DATAFRAME
 def loadExcel(file):
     try:# ACA AGREGAMOS LAS COLUMNAS SI ES PAROISSIEN
-        dataFrame = pd.read_excel(file, sheet_name=2, header=None, skiprows=4, usecols='B:F, I, J, O:R', 
-                    names=['Fecha', 'CubiertosDia', 'PromedioDia', 'CubiertosNoche', 'PromedioNoche', 'TotalTarjeta', 'TotalEfectivo', 'deliveryDia', 'deliveryNoche', 'totalDelivery', 'importeDelivery'],
-                    dtype={'B': datetime,
-                        'C': np.int32,
-                        'D': np.float64,
-                        'E': np.int32,
-                        'F': np.float64,
-                        'I': np.float64,
-                        'J': np.float64,
-                        'O': np.int32, 
-                        'P': np.int32,
-                        'Q': np.int32,
-                        'R': np.float64
-                        }).dropna()
+        # Nombres de columnas esperadas
+        column_names = [
+            'Fecha', 'CubiertosDia', 'PromedioDia', 'CubiertosNoche', 'PromedioNoche',
+            'TotalTarjeta', 'TotalEfectivo', 'deliveryDia', 'deliveryNoche', 
+            'totalDelivery', 'importeDelivery'
+        ]
+        dataFrame = pd.read_excel(
+            file,
+            sheet_name=2,
+            header=None,
+            skiprows=3,
+            usecols='B:F, I, J, O:R', 
+            names=column_names
+        )
+
+        # Columnas numéricas que deben ser int32 (las otras son strings o fechas)
+        numeric_cols = [
+            'CubiertosDia', 'PromedioDia', 'CubiertosNoche', 'PromedioNoche',
+            'TotalTarjeta', 'TotalEfectivo', 'deliveryDia', 'deliveryNoche',
+            'totalDelivery', 'importeDelivery'
+        ]
+
     except:# ACA AGREGAMOS LAS COLUMNAS para el resto
-        dataFrame = pd.read_excel(file, sheet_name=2, header=None, skiprows=4, usecols='B:F, I, J', 
-                    names=['Fecha', 'CubiertosDia', 'PromedioDia', 'CubiertosNoche', 'PromedioNoche', 'TotalTarjeta', 'TotalEfectivo'],
-                    dtype={'B': datetime,
-                        'C': np.int32,
-                        'D': np.float64,
-                        'E': np.int32,
-                        'F': np.float64,
-                        'I': np.float64,
-                        'J': np.float64,
-                        }).dropna()
+        column_names = ['Fecha', 'CubiertosDia', 'PromedioDia', 'CubiertosNoche', 'PromedioNoche', 'TotalTarjeta', 'TotalEfectivo']
+        dataFrame = pd.read_excel(
+            file,
+            sheet_name=2,
+            header=None,
+            skiprows=3,
+            usecols='B:F, I, J', 
+            names=column_names
+            )
+
+        # Columnas numéricas que deben ser int32 (las otras son strings o fechas)
+        numeric_cols = [
+            'CubiertosDia', 'PromedioDia', 'CubiertosNoche', 'PromedioNoche',
+            'TotalTarjeta', 'TotalEfectivo'
+        ]
+
+    # Convertir la columna de fecha
+    dataFrame['Fecha'] = pd.to_datetime(dataFrame['Fecha'], errors='coerce')
+
+    # Reemplazar strings vacíos con NaN
+    dataFrame[numeric_cols] = dataFrame[numeric_cols].replace(r'^\s*$', np.nan, regex=True)
+
+    # Convertir a numérico, luego reemplazar NaN con 0 y castear a int32
+    for col in numeric_cols:
+        dataFrame[col] = pd.to_numeric(dataFrame[col], errors='coerce').fillna(0).astype(np.int32)
+                
+    # Filtrar:
+    # 1. Que la fecha sea válida (descarta texto como 'TOTAL', etc.)
+    # 2. Que CubiertosDia o CubiertosNoche tengan algún valor > 0
+    # 3. Que ninguno supere un valor absurdo como 300 (opcional)
+    dataFrame = dataFrame[
+        (dataFrame['Fecha'].notnull()) &
+        (((dataFrame['CubiertosDia'] > 0) & (dataFrame['PromedioDia'] >0)) | ((dataFrame['CubiertosNoche'] > 0) & (dataFrame['PromedioNoche'] > 0))) &
+        (dataFrame['CubiertosDia'] < 1000) &
+        (dataFrame['CubiertosNoche'] < 1000)
+    ]
     return dataFrame
 
 # *** crea el cuadro
 def table_builder(shops, data):
     rootTable = tk.Tk()
-    rootTable.title('Titulo del Cuadro')
+    rootTable.title('Cuadro comparativo')
     style = ttk.Style()
     style.theme_use("clam")  # Use the 'clam' theme for better styling options
     style.configure("Treeview",
@@ -68,9 +102,11 @@ def table_builder(shops, data):
         columns = ('DIA', 'NOCHE', 'TOTAL', 'VENTAS', 'EFECTIVO', 'TARJETA', '% TARJETA-VENTAS',
                     'DELIVERY DIA', 'DELIVERY NOCHE', 'TOTAL DELIVERY', 'IMPORTE DELIVERY')
         wides = (80,80,80,120,120,120,80,80,80,80,120)
+        currency = (False, False, False, True, True, True, False, False, False, True )
     else:
         columns = ('DIA', 'NOCHE', 'TOTAL', 'VENTAS', 'EFECTIVO', 'TARJETA', '% TARJETA-VENTAS')
         wides = (80,80,80,120,120,120,80)
+        currency = (False, False, False, True, True, True, False)
 
     # Create a frame for the treeview to add a border
     frame = tk.Frame(rootTable, bg='#f0f0f0')
@@ -95,7 +131,7 @@ def table_builder(shops, data):
             if rowToCompare: #valida que haya una fila anterior para comparar
                 perc = value/rowToCompare[col]-1
                 difference = value - rowToCompare[col]
-                if col in range(3,6): # si son importes le doy formato
+                if currency[col]: # si son importes le doy formato
                     difference = format_currency(difference)
                 rowPercent.append(f"{difference} ({perc:.0%})")
             rows.append(value)
@@ -122,7 +158,7 @@ def table_builder(shops, data):
         rows[4] = format_currency(rows[4])  # EFECTIVO
         rows[5] = format_currency(rows[5])  # TARJETA
         if len(data)==10: #Paroissien
-            rows[9] = format_currency(rows[9])  # total delivery
+            rows[10] = format_currency(rows[10])  # importe delivery
         tv.insert("", tk.END, text=shop, values=rows, tags=('evenrow',))
     tv.pack(expand=True, fill='both')
     rootTable.mainloop()
