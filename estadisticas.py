@@ -70,13 +70,36 @@ def loadExcel(file):
     # 1. Que la fecha sea válida (descarta texto como 'TOTAL', etc.)
     # 2. Que CubiertosDia o CubiertosNoche tengan algún valor > 0
     # 3. Que ninguno supere un valor absurdo como 300 (opcional)
-    dataFrame = dataFrame[
+
+    condicion = (
         (dataFrame['Fecha'].notnull()) &
-        (((dataFrame['CubiertosDia'] > 0) & (dataFrame['PromedioDia'] >0)) | ((dataFrame['CubiertosNoche'] > 0) & (dataFrame['PromedioNoche'] > 0))) &
-        (dataFrame['CubiertosDia'] < 1000) &
-        (dataFrame['CubiertosNoche'] < 1000)
-    ]
-    return dataFrame
+        (
+            ((dataFrame['CubiertosDia'] > 0) & (dataFrame['TotalEfectivo'] > 0)) |
+            ((dataFrame['CubiertosNoche'] > 0) & (dataFrame['TotalEfectivo'] > 0))
+        ) &
+        (dataFrame['CubiertosDia'] < 3000) &
+        (dataFrame['CubiertosNoche'] < 3000)
+    )   
+    validos = dataFrame[condicion]
+    invalidos = dataFrame[~condicion]
+    if len(invalidos) != 0:
+        root_warning = tk.Tk()
+        root_warning.title(" W A R N I N G S")
+        root_warning.geometry("800x600+600+400")
+        tree = ttk.Treeview(root_warning, columns=("Fecha", "CD", "CN", "Efectivo"), show='headings')
+        tree.pack(fill="both", expand=True)
+        
+
+        tree.heading("Fecha", text="Fecha")
+        tree.heading("CD", text="Cubiertos Día")
+        tree.heading("CN", text="Cubiertos Noche")
+        tree.heading("Efectivo", text="Total Efectivo")
+
+        # Insertar las filas
+        for index, row in invalidos.iterrows():
+            tree.insert("", "end", values=(row['Fecha'], row['CubiertosDia'], row['CubiertosNoche'], row['TotalEfectivo']))
+
+    return validos
 
 # *** crea el cuadro
 def table_builder(shops, data):

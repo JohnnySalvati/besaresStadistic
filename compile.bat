@@ -1,0 +1,1 @@
+pyinstaller --noconsole --onefile estadisticas.py
